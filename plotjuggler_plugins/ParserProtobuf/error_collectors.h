@@ -6,8 +6,6 @@
 
 #include <QStringList>
 
-#include "absl/strings/string_view.h"
-
 class IoErrorCollector : public google::protobuf::io::ErrorCollector
 {
 public:
