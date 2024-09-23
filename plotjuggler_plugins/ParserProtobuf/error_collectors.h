@@ -12,10 +12,10 @@ class IoErrorCollector : public google::protobuf::io::ErrorCollector
 {
 public:
   void RecordError(int line, google::protobuf::io::ColumnNumber column,
-                const absl::string_view message) override;
+                   const absl::string_view message) override;
 
   void RecordWarning(int line, google::protobuf::io::ColumnNumber column,
-                  const absl::string_view message) override;
+                     const absl::string_view message) override;
 
   const QStringList& errors()
   {
@@ -30,10 +30,10 @@ class FileErrorCollector : public google::protobuf::compiler::MultiFileErrorColl
 {
 public:
   void RecordError(const absl::string_view filename, int line, int,
-                const absl::string_view message) override;
+                   const absl::string_view message) override;
 
   void RecordWarning(const absl::string_view filename, int line, int,
-                  const absl::string_view message) override;
+                     const absl::string_view message) override;
 
   const QStringList& errors()
   {
