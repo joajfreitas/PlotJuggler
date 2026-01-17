@@ -18,11 +18,71 @@ THE SOFTWARE.
 
 #include <QUdpSocket>
 #include <QtPlugin>
+#include <QThread>
+#include <QNetworkDatagram>
+#include <QMessageBox>
 #include <thread>
+#include <mutex>
 #include "PlotJuggler/datastreamer_base.h"
 #include "PlotJuggler/messageparser_base.h"
 
 using namespace PJ;
+
+class Worker: public QObject {
+  Q_OBJECT
+
+  public:
+  Worker() = default;
+  Worker(QUdpSocket* udp_socket, PJ::MessageParserPtr parser): _udp_socket{udp_socket}, _parser{parser} {};
+
+  void process() {
+    while (_udp_socket->hasPendingDatagrams())
+    {
+      QNetworkDatagram datagram = _udp_socket->receiveDatagram();
+
+      using namespace std::chrono;
+      auto ts = high_resolution_clock::now().time_since_epoch();
+      double timestamp = 1e-6 * double(duration_cast<microseconds>(ts).count());
+
+      QByteArray m = datagram.data();
+      MessageRef msg(reinterpret_cast<uint8_t*>(m.data()), m.count());
+
+      try
+      {
+        std::mutex m{};
+        std::lock_guard<std::mutex> lock(m);
+        // important use the mutex to protect any access to the data
+        _parser->parseMessage(msg, timestamp);
+      }
+      catch (std::exception& err)
+      {
+        QMessageBox::warning(nullptr, tr("UDP Server"),
+                             tr("Problem parsing the message. UDP Server will be "
+                                "stopped.\n%1")
+                                 .arg(err.what()),
+                             QMessageBox::Ok);
+        //shutdown();
+        //// notify the GUI
+        emit closed();
+        return;
+      }
+    }
+    //// notify the GUI
+    emit dataReceived();
+    std::cout << "out" << std::endl;
+    return;
+  }
+
+  private:
+  QUdpSocket* _udp_socket;
+  PJ::MessageParserPtr _parser;
+
+  signals:
+    void dataReceived(void);
+    void closed(void);
+    void shutdown(void);
+
+};
 
 class UDP_Server : public PJ::DataStreamer
 {
@@ -58,8 +118,17 @@ private:
   bool _running;
   QUdpSocket* _udp_socket;
   PJ::MessageParserPtr _parser;
+  QThread _worker_thread;
+  Worker* _worker;
 
 private slots:
 
   void processMessage();
+  void emitDataReceived();
+  void emitClosed();
+  void callShutdown();
+
+signals:
+    void trigger_message_processing();
 };
+
